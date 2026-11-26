@@ -1,0 +1,30 @@
+-- OPERATOR-APPLIED, NOT part of `prisma migrate deploy` (it lives outside prisma/migrations on purpose).
+-- Database roles (docs/planning/DATABASE_DESIGN.md section 9). Replace the <PLACEHOLDERS> and run once per database as a
+-- superuser/owner. Never put real passwords in this file or in git.
+--
+--   itsm_migrator : owns the schema; used only by `prisma migrate deploy` (DIRECT_URL).
+--   itsm_app      : runtime role (DATABASE_URL). Audit log is append-only for it.
+
+CREATE ROLE itsm_migrator LOGIN PASSWORD '<MIGRATOR_PASSWORD>';
+CREATE ROLE itsm_app      LOGIN PASSWORD '<APP_PASSWORD>';
+
+GRANT CONNECT ON DATABASE <DATABASE_NAME> TO itsm_migrator, itsm_app;
+GRANT USAGE ON SCHEMA public TO itsm_app;
+GRANT CREATE, USAGE ON SCHEMA public TO itsm_migrator;
+
+-- Run the following AFTER the migrator has applied migrations (tables must exist).
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO itsm_app;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO itsm_app;
+
+-- Audit log: INSERT/SELECT only for the runtime role.
+REVOKE UPDATE, DELETE, TRUNCATE ON "AuditLog" FROM itsm_app;
+
+-- Prisma's migration bookkeeping is not touched by the runtime role.
+REVOKE ALL ON "_prisma_migrations" FROM itsm_app;
+
+-- Tables created by future migrations inherit the same grants.
+ALTER DEFAULT PRIVILEGES FOR ROLE itsm_migrator IN SCHEMA public
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO itsm_app;
+ALTER DEFAULT PRIVILEGES FOR ROLE itsm_migrator IN SCHEMA public
+  GRANT USAGE, SELECT ON SEQUENCES TO itsm_app;
+-- After each migration re-run: REVOKE UPDATE, DELETE, TRUNCATE ON "AuditLog" FROM itsm_app;

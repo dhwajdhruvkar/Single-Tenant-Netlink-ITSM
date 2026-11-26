@@ -1,5 +1,5 @@
-// Phase 1 placeholder: generator + datasource only so the client can be generated and the app can connect.
-// Phase 2 replaces this with the full baseline schema (docs/planning/DATABASE_DESIGN.md).
+// Netlink ITSM baseline schema (docs/planning/DATABASE_DESIGN.md, Doc C). Release 2 models are added by later migrations.
+// Raw-SQL objects (extensions, trigram/partial indexes, CHECK constraints) live in migration 0002_indexes_checks.
 
 generator client {
   provider      = "prisma-client-js"
@@ -11,4 +11,528 @@ datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
+}
+
+// ---------- Enums ----------
+enum AppRole {
+  employee
+  submitter
+  agent
+  manager
+  admin
+}
+
+enum RoleSource {
+  entra
+  manual
+}
+
+enum AccountStatus {
+  active
+  disabled
+}
+
+enum TicketType {
+  incident
+  service_request
+}
+
+enum TicketStatus {
+  new
+  assigned
+  in_progress
+  on_hold
+  resolved
+  closed
+  cancelled
+}
+
+enum HoldReason {
+  awaiting_requester
+  awaiting_vendor
+  awaiting_change
+  scheduled
+  other
+}
+
+// [OPEN] P5 if IT uses 5 levels
+enum Priority {
+  p1
+  p2
+  p3
+  p4
+}
+
+enum Level {
+  low
+  medium
+  high
+}
+
+enum TicketChannel {
+  portal
+  phone
+  walk_in
+  email
+  teams
+  chat
+}
+
+enum MessageVisibility {
+  public
+  internal
+}
+
+enum AuthorKind {
+  employee
+  agent
+  system
+}
+
+enum AttachmentStatus {
+  staged
+  linked
+  deleted
+}
+
+enum ScanStatus {
+  not_scanned
+  pending
+  clean
+  infected
+  failed
+}
+
+enum StorageProvider {
+  database
+  s3
+  azure_blob
+  local
+}
+
+enum GroupStrategy {
+  manual
+  round_robin
+  least_loaded
+}
+
+enum GroupMemberRole {
+  member
+  lead
+}
+
+enum JobStatus {
+  queued
+  running
+  succeeded
+  failed
+  dead
+}
+
+// R2
+enum ApprovalState {
+  pending
+  approved
+  rejected
+  cancelled
+}
+
+// ---------- Organisation ----------
+model Department {
+  id            String     @id @default(uuid()) @db.Uuid
+  name          String     @unique // display name
+  directoryName String?    @unique // exact Entra `department` value it maps from
+  active        Boolean    @default(true)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  employees     Employee[]
+}
+
+model Location {
+  id            String     @id @default(uuid()) @db.Uuid
+  name          String     @unique
+  directoryName String?    @unique // Entra officeLocation value
+  timezone      String? // IANA
+  active        Boolean    @default(true)
+  employees     Employee[]
+}
+
+// ---------- Directory identity ----------
+model Employee {
+  id                 String    @id @default(uuid()) @db.Uuid
+  entraObjectId      String    @unique @db.Uuid // Entra `oid` — the stable key
+  userPrincipalName  String // may change (rename)
+  mail               String? // may be null/changed; NOT unique key
+  displayName        String
+  givenName          String?
+  surname            String?
+  employeeNumber     String? // Entra employeeId (optional)
+  jobTitle           String?
+  departmentId       String?   @db.Uuid
+  departmentRaw      String? // raw Entra department text
+  locationId         String?   @db.Uuid
+  officeLocationRaw  String?
+  businessPhone      String?
+  mobilePhone        String?
+  managerId          String?   @db.Uuid
+  accountEnabled     Boolean   @default(true)
+  isEligible         Boolean   @default(true) // passes employee filter (member, not shared mailbox…)
+  lastSyncedAt       DateTime?
+  directoryDeletedAt DateTime? // removed from Entra; never hard-deleted
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  department       Department?             @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  location         Location?               @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  manager          Employee?               @relation("Manager", fields: [managerId], references: [id], onDelete: SetNull)
+  reports          Employee[]              @relation("Manager")
+  account          UserAccount?
+  groupMemberships AssignmentGroupMember[]
+  ticketsRequested Ticket[]                @relation("Requester")
+  ticketsCreated   Ticket[]                @relation("CreatedBy")
+  ticketsAssigned  Ticket[]                @relation("Assignee")
+  notifications    Notification[]
+  // raw SQL migration: CREATE INDEX employee_search_trgm ON "Employee" USING gin ((lower("displayName"||' '||coalesce("mail",'')||' '||"userPrincipalName"||' '||coalesce("employeeNumber",''))) gin_trgm_ops);
+
+  @@index([mail])
+  @@index([userPrincipalName])
+  @@index([employeeNumber])
+  @@index([departmentId])
+  @@index([isEligible, accountEnabled, displayName])
+}
+
+// ---------- Application access ----------
+model UserAccount {
+  id             String            @id @default(uuid()) @db.Uuid
+  employeeId     String            @unique @db.Uuid
+  status         AccountStatus     @default(active)
+  role           AppRole           @default(employee) // effective (highest) role, denormalised
+  sessionVersion Int               @default(1) // bump to revoke sessions
+  lastSignInAt   DateTime?
+  disabledAt     DateTime?
+  disabledReason String?
+  preferences    Json?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  employee       Employee          @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  roles          UserAccountRole[]
+
+  @@index([role, status])
+}
+
+model UserAccountRole {
+  userAccountId String      @db.Uuid
+  role          AppRole
+  source        RoleSource
+  grantedById   String?     @db.Uuid // Employee.id for manual grants
+  grantedAt     DateTime    @default(now())
+  userAccount   UserAccount @relation(fields: [userAccountId], references: [id], onDelete: Cascade)
+
+  @@id([userAccountId, role, source])
+}
+
+// ---------- Assignment ----------
+model AssignmentGroup {
+  id                 String                  @id @default(uuid()) @db.Uuid
+  name               String                  @unique
+  description        String?
+  email              String?
+  isTriage           Boolean                 @default(false) // sees unassigned-group tickets
+  strategy           GroupStrategy           @default(manual)
+  rrCursor           Int                     @default(0)
+  teamsWebhookUrlRef String? // R2: name of env/secret, not the URL itself
+  active             Boolean                 @default(true)
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+  members            AssignmentGroupMember[]
+  categories         Category[]
+  tickets            Ticket[]
+}
+
+model AssignmentGroupMember {
+  groupId    String          @db.Uuid
+  employeeId String          @db.Uuid
+  role       GroupMemberRole @default(member)
+  addedAt    DateTime        @default(now())
+  group      AssignmentGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  employee   Employee        @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@id([groupId, employeeId])
+  @@index([employeeId])
+}
+
+model Category {
+  id             String           @id @default(uuid()) @db.Uuid
+  name           String
+  parentId       String?          @db.Uuid
+  ticketTypes    TicketType[]
+  defaultGroupId String?          @db.Uuid
+  defaultImpact  Level?
+  defaultUrgency Level?
+  sortOrder      Int              @default(0)
+  active         Boolean          @default(true)
+  parent         Category?        @relation("CategoryTree", fields: [parentId], references: [id], onDelete: Restrict)
+  children       Category[]       @relation("CategoryTree")
+  defaultGroup   AssignmentGroup? @relation(fields: [defaultGroupId], references: [id], onDelete: SetNull)
+  tickets        Ticket[]
+
+  @@unique([parentId, name])
+}
+
+// ---------- SLA ----------
+model BusinessCalendar {
+  id          String            @id @default(uuid()) @db.Uuid
+  name        String            @unique
+  timezone    String // IANA, e.g. America/New_York [OPEN]
+  workDays    Int[] // 1=Mon..7=Sun
+  startMinute Int // minutes from midnight, e.g. 540
+  endMinute   Int // e.g. 1080
+  holidays    BusinessHoliday[]
+  policies    SlaPolicy[]
+}
+
+model BusinessHoliday {
+  id         String           @id @default(uuid()) @db.Uuid
+  calendarId String           @db.Uuid
+  date       DateTime         @db.Date
+  name       String
+  calendar   BusinessCalendar @relation(fields: [calendarId], references: [id], onDelete: Cascade)
+
+  @@unique([calendarId, date])
+}
+
+model SlaPolicy {
+  id              String            @id @default(uuid()) @db.Uuid
+  name            String            @unique
+  priority        Priority
+  ticketType      TicketType? // null = applies to all types
+  responseMinutes Int
+  resolveMinutes  Int
+  calendarId      String?           @db.Uuid // null = 24x7
+  active          Boolean           @default(true)
+  calendar        BusinessCalendar? @relation(fields: [calendarId], references: [id])
+  tickets         Ticket[]
+  // raw SQL: CREATE UNIQUE INDEX sla_active_unique ON "SlaPolicy"(priority, coalesce("ticketType"::text,'*')) WHERE active;
+}
+
+// ---------- Tickets ----------
+model Ticket {
+  id                     String        @id @default(uuid()) @db.Uuid
+  number                 BigInt        @unique @default(autoincrement()) // sequence-backed
+  reference              String        @unique // e.g. INC0001042 (fixed at creation)
+  type                   TicketType
+  status                 TicketStatus  @default(new)
+  holdReason             HoldReason?
+  channel                TicketChannel
+  subject                String        @db.VarChar(200)
+  description            String // ≤ 20,000 chars (validated)
+  categoryId             String?       @db.Uuid
+  impact                 Level
+  urgency                Level
+  priority               Priority
+  priorityOverridden     Boolean       @default(false)
+  priorityOverrideReason String?
+  typeDetails            Json? // sanitised per type
+
+  requesterEmployeeId String  @db.Uuid
+  createdByEmployeeId String  @db.Uuid
+  requesterName       String // snapshot
+  requesterEmail      String? // snapshot
+  requesterDepartment String? // snapshot
+  requesterJobTitle   String? // snapshot
+  requesterLocation   String? // snapshot (may be overridden by caller text)
+  contactPhone        String?
+
+  assignmentGroupId  String? @db.Uuid
+  assigneeEmployeeId String? @db.Uuid
+
+  slaPolicyId        String?   @db.Uuid
+  responseDueAt      DateTime?
+  resolveDueAt       DateTime?
+  firstRespondedAt   DateTime?
+  slaPausedAt        DateTime?
+  slaPausedMinutes   Int       @default(0)
+  responseBreachedAt DateTime? // set by job (for reporting/notification), display derives from dueAt
+  resolveBreachedAt  DateTime?
+
+  resolvedAt           DateTime?
+  resolvedByEmployeeId String?   @db.Uuid
+  resolutionCode       String?
+  resolutionNotes      String?
+  closedAt             DateTime?
+  reopenCount          Int       @default(0)
+
+  idempotencyKey       String?
+  version              Int                      @default(0) // optimistic concurrency
+  search               Unsupported("tsvector")? @default(dbgenerated("to_tsvector('simple'::regconfig, ((((COALESCE(reference, ''::text) || ' '::text) || (subject)::text) || ' '::text) || description))")) // GENERATED ALWAYS in migration 0001; never written by the app
+  archivedAt           DateTime?
+  archivedByEmployeeId String?                  @db.Uuid
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
+
+  requester       Employee         @relation("Requester", fields: [requesterEmployeeId], references: [id], onDelete: Restrict)
+  createdBy       Employee         @relation("CreatedBy", fields: [createdByEmployeeId], references: [id], onDelete: Restrict)
+  assignee        Employee?        @relation("Assignee", fields: [assigneeEmployeeId], references: [id], onDelete: SetNull)
+  assignmentGroup AssignmentGroup? @relation(fields: [assignmentGroupId], references: [id], onDelete: SetNull)
+  category        Category?        @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  slaPolicy       SlaPolicy?       @relation(fields: [slaPolicyId], references: [id], onDelete: SetNull)
+  messages        TicketMessage[]
+  events          TicketEvent[]
+  attachments     Attachment[]
+  // raw SQL: partial index for SLA sweeps
+  // CREATE INDEX ticket_open_resolve_due ON "Ticket"("resolveDueAt") WHERE status IN ('new','assigned','in_progress') AND "archivedAt" IS NULL;
+  // raw SQL: full-text  ALTER TABLE "Ticket" ADD COLUMN search tsvector GENERATED ALWAYS AS (to_tsvector('simple', coalesce(reference,'')||' '||subject||' '||description)) STORED; CREATE INDEX ticket_search ON "Ticket" USING gin(search);
+  // raw SQL: CHECK (("status" = 'on_hold') = ("holdReason" IS NOT NULL))
+
+  @@unique([createdByEmployeeId, idempotencyKey])
+  @@index([status, assignmentGroupId, priority])
+  @@index([assigneeEmployeeId, status])
+  @@index([requesterEmployeeId, createdAt(sort: Desc)])
+  @@index([createdByEmployeeId, createdAt(sort: Desc)])
+  @@index([createdAt])
+  @@index([archivedAt])
+  @@index([search], type: Gin)
+}
+
+model TicketMessage {
+  id                  String            @id @default(uuid()) @db.Uuid
+  ticketId            String            @db.Uuid
+  authorEmployeeId    String?           @db.Uuid // null for system
+  authorKind          AuthorKind
+  visibility          MessageVisibility @default(public)
+  body                String
+  createdAt           DateTime          @default(now())
+  editedAt            DateTime?
+  deletedAt           DateTime?
+  deletedByEmployeeId String?           @db.Uuid
+  ticket              Ticket            @relation(fields: [ticketId], references: [id], onDelete: Restrict)
+  attachments         Attachment[]
+
+  @@index([ticketId, createdAt])
+}
+
+model TicketEvent {
+  id              String   @id @default(uuid()) @db.Uuid
+  ticketId        String   @db.Uuid
+  type            String // created | status_changed | assigned | group_changed | priority_changed | message_added | attachment_added | sla_breached | escalated | reopened | archived
+  actorEmployeeId String?  @db.Uuid
+  fromValue       String?
+  toValue         String?
+  data            Json?
+  createdAt       DateTime @default(now())
+  ticket          Ticket   @relation(fields: [ticketId], references: [id], onDelete: Restrict)
+
+  @@index([ticketId, createdAt])
+  @@index([type, createdAt])
+}
+
+// ---------- Attachments ----------
+model Attachment {
+  id                   String           @id @default(uuid()) @db.Uuid
+  ticketId             String?          @db.Uuid // null while staged
+  messageId            String?          @db.Uuid
+  status               AttachmentStatus @default(staged)
+  storageProvider      StorageProvider
+  storageKey           String           @unique // itsm/{env}/att/{yyyy}/{mm}/{uuid}
+  fileName             String           @db.VarChar(255)
+  contentType          String
+  sizeBytes            Int
+  sha256               String           @db.Char(64)
+  scanStatus           ScanStatus       @default(not_scanned)
+  scannedAt            DateTime?
+  uploadedByEmployeeId String           @db.Uuid
+  createdAt            DateTime         @default(now())
+  linkedAt             DateTime?
+  deletedAt            DateTime?
+  ticket               Ticket?          @relation(fields: [ticketId], references: [id], onDelete: Restrict)
+  message              TicketMessage?   @relation(fields: [messageId], references: [id], onDelete: SetNull)
+
+  @@index([ticketId])
+  @@index([status, createdAt])
+  @@index([uploadedByEmployeeId, status])
+}
+
+model StoredObject {
+  key         String   @id
+  contentType String
+  data        Bytes
+  createdAt   DateTime @default(now())
+}
+
+// ---------- Notifications, jobs, audit ----------
+model Notification {
+  id                  String    @id @default(uuid()) @db.Uuid
+  recipientEmployeeId String    @db.Uuid
+  type                String
+  title               String
+  body                String
+  link                String?
+  ticketId            String?   @db.Uuid
+  readAt              DateTime?
+  createdAt           DateTime  @default(now())
+  recipient           Employee  @relation(fields: [recipientEmployeeId], references: [id], onDelete: Cascade)
+
+  @@index([recipientEmployeeId, readAt, createdAt(sort: Desc)])
+}
+
+model Job {
+  id          String    @id @default(uuid()) @db.Uuid
+  kind        String // notify.email | notify.in_app | notify.teams | sla.evaluate | directory.sync | attachments.cleanup | ticket.autoclose
+  payload     Json
+  dedupeKey   String?   @unique
+  status      JobStatus @default(queued)
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(8)
+  runAfter    DateTime  @default(now())
+  lockedBy    String?
+  lockedUntil DateTime?
+  lastError   String?
+  createdAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  @@index([status, runAfter])
+}
+
+model JobSchedule {
+  name          String    @id
+  lastSlotAt    DateTime?
+  leaseOwner    String?
+  leaseUntil    DateTime?
+  lastSuccessAt DateTime?
+  lastError     String?
+  cursor        String? // e.g. Graph deltaLink for directory sync
+}
+
+model AuditLog {
+  id              BigInt   @id @default(autoincrement())
+  occurredAt      DateTime @default(now())
+  actorEmployeeId String?  @db.Uuid
+  actorType       String // user | system | job
+  action          String // auth.signin, ticket.create, ticket.assign, role.grant, account.disable, attachment.download ...
+  entityType      String
+  entityId        String?
+  ticketId        String?  @db.Uuid
+  requestId       String?
+  ipHash          String? // hashed client IP [OPEN: privacy policy]
+  changes         Json? // {field: [before, after]} — never secrets, never attachment bytes
+
+  @@index([entityType, entityId])
+  @@index([ticketId])
+  @@index([actorEmployeeId, occurredAt])
+  @@index([action, occurredAt])
+}
+
+model RateLimitBucket {
+  key     String   @id
+  count   Int
+  resetAt DateTime
+
+  @@index([resetAt])
+}
+
+model CompanySetting {
+  key         String   @id // e.g. "ticket.autoCloseDays", "ticket.reopenWindowDays"
+  value       Json
+  updatedById String?  @db.Uuid
+  updatedAt   DateTime @updatedAt
 }

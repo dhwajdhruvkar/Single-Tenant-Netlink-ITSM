@@ -11,6 +11,20 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: itsm
+          POSTGRES_PASSWORD: itsm
+          POSTGRES_DB: itsm_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U itsm -d itsm_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -29,6 +43,17 @@ jobs:
         run: npm run lint
       - name: Unit tests
         run: npm test
+      - name: Create shadow database for the migration drift check
+        run: PGPASSWORD=itsm psql -h localhost -U itsm -d itsm_test -c 'CREATE DATABASE itsm_shadow'
+      - name: Migration drift check (migrations vs schema.prisma)
+        run: >-
+          npx prisma migrate diff --from-migrations prisma/migrations --to-schema-datamodel prisma/schema.prisma
+          --shadow-database-url postgresql://itsm:itsm@localhost:5432/itsm_shadow --exit-code
+        env:
+          DATABASE_URL: postgresql://itsm:itsm@localhost:5432/itsm_test
+          DIRECT_URL: postgresql://itsm:itsm@localhost:5432/itsm_test
+      - name: Integration tests (applies migrations to the CI database first)
+        run: npm run test:integration
       # Non-blocking in Phase 0: the pinned baseline versions (next 16.3.7, next-auth 5.0.0-beta.31) have known
       # advisories. The roadmap keeps pins for the baseline and upgrades in a separate PR; make this blocking then.
       - name: Audit production dependencies (non-blocking until the dependency-upgrade PR)

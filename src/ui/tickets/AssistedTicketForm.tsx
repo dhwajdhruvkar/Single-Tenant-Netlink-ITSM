@@ -5,6 +5,7 @@ import { useRef, useState, type FormEvent } from "react";
 import { EmployeeSearch, type EmployeeResult } from "@/ui/directory/EmployeeSearch";
 import { Button } from "@/ui/primitives";
 import { AgentOnlyFields, type GroupChoice } from "./AgentOnlyFields";
+import { AttachmentPicker } from "./AttachmentPicker";
 import { ErrorSummary } from "./ErrorSummary";
 import { buildAssistedPayload, EMPTY_AGENT_FIELDS, EMPTY_FORM, type AgentFields, type TicketFormValues } from "./payload";
 import { RequesterCard } from "./RequesterCard";
@@ -23,7 +24,7 @@ export interface RecentTicket {
  * different person replaces it. "Created by" is shown read-only.
  */
 export function AssistedTicketForm({
-  agentName, categories, groups, canOverride, onCreated, loadRecent,
+  agentName, categories, groups, canOverride, onCreated, loadRecent, attachments,
 }: {
   agentName: string;
   categories: CategoryChoice[];
@@ -31,6 +32,7 @@ export function AssistedTicketForm({
   canOverride: boolean;
   onCreated?: (reference: string) => void;
   loadRecent?: (employeeId: string) => Promise<RecentTicket[]>;
+  attachments?: { maxBytes: number };
 }) {
   const router = useRouter();
   const [values, setValues] = useState<TicketFormValues>(EMPTY_FORM);
@@ -39,6 +41,8 @@ export function AssistedTicketForm({
   const [recent, setRecent] = useState<RecentTicket[]>([]);
   const [localError, setLocalError] = useState<string | null>(null);
   const selectedId = useRef<string | null>(null);
+  const [attachmentIds, setAttachmentIds] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
   const { submit, submitting, error } = useCreateTicket("/api/tickets/assisted");
 
   async function select(e: EmployeeResult) {
@@ -66,7 +70,7 @@ export function AssistedTicketForm({
   async function onSubmit(ev: FormEvent) {
     ev.preventDefault();
     if (!requester) return setLocalError("Select the employee this ticket is for.");
-    const result = await submit(buildAssistedPayload(values, requester.id, agent));
+    const result = await submit(buildAssistedPayload(values, requester.id, agent, attachmentIds));
     if (!result) return;
     if (onCreated) onCreated(result.reference);
     else router.push(`/desk/tickets/${result.reference}?created=1`);
@@ -98,7 +102,8 @@ export function AssistedTicketForm({
 
       <AgentOnlyFields value={agent} onChange={(p) => setAgent((a) => ({ ...a, ...p }))} groups={groups} errors={error?.fields ?? {}} canOverride={canOverride} />
       <TicketFormFields values={values} onChange={(p) => setValues((v) => ({ ...v, ...p }))} errors={error?.fields ?? {}} categories={categories} />
-      <Button type="submit" disabled={submitting}>{submitting ? "Submitting…" : "Create ticket"}</Button>
+      {attachments ? <AttachmentPicker maxBytes={attachments.maxBytes} onChange={setAttachmentIds} onBusyChange={setUploading} /> : null}
+      <Button type="submit" disabled={submitting || uploading}>{uploading ? "Uploading files…" : submitting ? "Submitting…" : "Create ticket"}</Button>
     </form>
   );
 }

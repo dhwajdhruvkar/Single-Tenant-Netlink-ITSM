@@ -33,7 +33,7 @@
   land; the full list, detail page, lifecycle and conversation are Phase 7.
 
 ## Not done / caveats
-- No attachments yet (Phase 6). The categories dropdown is empty until categories exist (the seed adds one placeholder).
+- Attachments were added in Phase 6 (see `attachments.md`). The categories dropdown is empty until categories exist (the seed adds one placeholder).
 - Component tests run under jsdom; **no real-browser test** (Playwright E2E is Phase 14), so layout, focus rings and real screen-reader
   behaviour are unverified. The accessibility checks are limited to labels, roles, focus on the error summary and keyboard operation.
 - Component tests run in the default `npm test` (`tests/component`, jsdom via a per-file docblock).

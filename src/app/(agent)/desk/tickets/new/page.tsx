@@ -3,6 +3,7 @@ import { can } from "@/modules/identity/permissions";
 import { atLeast } from "@/modules/identity/roleMapping";
 import { listCategoriesFor, listGroupsWithMembers } from "@/modules/tickets/queries";
 import { prisma } from "@/platform/db/prisma";
+import { attachmentsUiConfig } from "@/platform/storage";
 import { getPageActor } from "@/platform/http/pageActor";
 import { AppShell } from "@/ui/AppShell";
 import { Forbidden } from "@/ui/Forbidden";
@@ -26,11 +27,12 @@ export default async function AssistedNewTicketPage() {
   ]);
   const categories = [...new Map([...incident, ...request].map((c) => [c.id, c])).values()];
 
+  const attachments = attachmentsUiConfig();
   return (
     <AppShell>
       <PageHeader title="Log a ticket for an employee" description="Find the person, then describe their issue." />
       <div className="max-w-2xl">
-        <AssistedTicketForm agentName={me?.displayName ?? "You"} categories={categories} groups={groups} canOverride={agent} loadRecent={loadRecent} />
+        <AssistedTicketForm agentName={me?.displayName ?? "You"} categories={categories} groups={groups} canOverride={agent} loadRecent={loadRecent} attachments={attachments} />
       </div>
     </AppShell>
   );

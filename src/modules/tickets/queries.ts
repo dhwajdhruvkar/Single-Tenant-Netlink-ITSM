@@ -1,9 +1,10 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 import type { Actor } from "@/modules/identity/actor";
 import type { PolicyOptions } from "@/modules/identity/permissions";
+import { atLeast } from "@/modules/identity/roleMapping";
 import { visibleTicketsWhere } from "./access";
 
-type Db = Pick<PrismaClient, "ticket" | "category" | "assignmentGroup">;
+type Db = Pick<PrismaClient, "ticket" | "category" | "assignmentGroup" | "attachment">;
 
 export interface TicketListItem {
   id: string;
@@ -50,7 +51,15 @@ export async function listRecentForRequester(db: Pick<Db, "ticket">, actor: Acto
   });
 }
 
+export interface AttachmentItem {
+  id: string;
+  fileName: string;
+  contentType: string;
+  sizeBytes: number;
+}
+
 export interface TicketSummary extends TicketListItem {
+  attachments: AttachmentItem[];
   description: string;
   impact: string;
   urgency: string;
@@ -63,14 +72,24 @@ export interface TicketSummary extends TicketListItem {
 }
 
 /** A ticket by reference, only if the actor may see it (otherwise null => 404; existence is never revealed). */
-export async function getTicketSummaryForViewer(db: Pick<Db, "ticket">, actor: Actor, reference: string, options: PolicyOptions = {}): Promise<TicketSummary | null> {
+export async function getTicketSummaryForViewer(db: Pick<Db, "ticket" | "attachment">, actor: Actor, reference: string, options: PolicyOptions = {}): Promise<TicketSummary | null> {
   const t = await db.ticket.findFirst({
     where: { AND: [visibleTicketsWhere(actor, options), { reference }] },
     select: { ...listSelect, description: true, impact: true, urgency: true, channel: true, responseDueAt: true, resolveDueAt: true, createdBy: { select: { displayName: true } }, assignmentGroup: { select: { name: true } }, assignee: { select: { displayName: true } } },
   });
   if (!t) return null;
   const { createdBy, assignmentGroup, assignee, ...rest } = t;
-  return { ...rest, createdByName: createdBy.displayName, assignmentGroup: assignmentGroup?.name ?? null, assignee: assignee?.displayName ?? null };
+  // Files on internal messages are filtered in the query itself: non-agents never receive them.
+  const attachments = await db.attachment.findMany({
+    where: {
+      ticketId: t.id,
+      status: "linked",
+      ...(atLeast(actor.role, "agent") ? {} : { OR: [{ messageId: null }, { message: { visibility: "public", deletedAt: null } }] }),
+    },
+    orderBy: { createdAt: "asc" },
+    select: { id: true, fileName: true, contentType: true, sizeBytes: true },
+  });
+  return { ...rest, attachments, createdByName: createdBy.displayName, assignmentGroup: assignmentGroup?.name ?? null, assignee: assignee?.displayName ?? null };
 }
 
 export interface GroupOption {

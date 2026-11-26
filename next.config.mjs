@@ -19,7 +19,7 @@ const nextConfig = {
     return [
       { source: "/:path*", headers: securityHeaders },
       // Authenticated content must not be cached or shown by the back button after sign-out.
-      { source: "/((?!_next/static|_next/image|favicon.ico).*)", headers: [{ key: "Cache-Control", value: "no-store" }] },
+      { source: "/((?!_next/static|_next/image|favicon.ico).*)", headers: [{ key: "Cache-Control", value: "private, no-store" }] },
     ];
   },
   serverExternalPackages: ["@prisma/client", ".prisma/client"],

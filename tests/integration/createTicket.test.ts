@@ -4,7 +4,7 @@ import type { Actor } from "@/modules/identity/actor";
 import type { AppRole } from "@/modules/identity/roleMapping";
 import { createTicket, type CreateTicketCommand } from "@/modules/tickets/createTicket";
 import { fixedClock } from "@/platform/clock";
-import { ConflictError, ForbiddenError, UnprocessableError, ValidationError } from "@/platform/errors";
+import { ConflictError, ForbiddenError, UnprocessableError } from "@/platform/errors";
 import { disconnect, resetDatabase, testPrisma } from "./setup";
 
 const prisma = testPrisma();
@@ -81,10 +81,6 @@ describe("self-service (Form B)", () => {
     expect((await prisma.ticket.findUniqueOrThrow({ where: { id: ticket.id } })).typeDetails).toEqual({ affectedService: "VPN" });
   });
 
-  it("rejects attachments until the attachment phase lands", async () => {
-    const actor = await actorOf("employee");
-    await expect(createTicket(deps, actor, self({ attachmentIds: [randomUUID()] }))).rejects.toBeInstanceOf(ValidationError);
-  });
 });
 
 describe("assisted (Form A)", () => {

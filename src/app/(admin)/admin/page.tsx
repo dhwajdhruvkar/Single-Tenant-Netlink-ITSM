@@ -20,6 +20,7 @@ export default async function AdminHome() {
           <li><Link className="text-blue-700 underline" href="/admin/groups">Assignment groups and members</Link></li>
           <li><Link className="text-blue-700 underline" href="/admin/categories">Categories</Link></li>
           <li><Link className="text-blue-700 underline" href="/admin/sla">SLA policies and calendars</Link></li>
+          <li><Link className="text-blue-700 underline" href="/admin/reports">Reports and CSV export</Link></li>
         </ul>
       </Card>
     </AppShell>

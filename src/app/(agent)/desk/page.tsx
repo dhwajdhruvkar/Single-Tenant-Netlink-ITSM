@@ -53,7 +53,7 @@ export default async function DeskPage({ searchParams }: { searchParams: Promise
     <AppShell>
       <LivePoller />
       <PageHeader title="Service desk" />
-      <p className="mb-3"><Link href="/desk/tickets/new" className="text-sm text-blue-700 underline">Log a ticket for an employee</Link></p>
+      <p className="mb-3 flex gap-4 text-sm"><Link href="/desk/tickets/new" className="text-blue-700 underline">Log a ticket for an employee</Link><Link href="/desk/dashboard" className="text-blue-700 underline">Dashboard</Link></p>
       <nav aria-label="Queues" className="mb-3 flex flex-wrap gap-2">
         {tabs.map((t) => (
           <Link key={t.view} href={href({ view: t.view, page: 1 })} aria-current={t.view === view ? "page" : undefined}

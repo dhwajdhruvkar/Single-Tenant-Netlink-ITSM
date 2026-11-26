@@ -21,7 +21,7 @@ must only target local Docker Postgres.
 
 There is intentionally no `db:push` or `db:reset` script.
 
-> npm note: with npm 10.9 the `vitest@4.1.11` peer set crashes the resolver (`Cannot read properties of null
+
 > (reading 'edgesOut')`). The lockfile was generated with npm 11; `npm ci` works with the bundled npm 10.
 
 ## Repository settings (owner action)

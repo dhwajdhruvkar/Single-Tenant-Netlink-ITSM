@@ -54,11 +54,8 @@ jobs:
           DIRECT_URL: postgresql://itsm:itsm@localhost:5432/itsm_test
       - name: Integration tests (applies migrations to the CI database first)
         run: npm run test:integration
-      # Non-blocking in Phase 0: the pinned baseline versions (next 16.3.7, next-auth 5.0.0-beta.31) have known
-      # advisories. The roadmap keeps pins for the baseline and upgrades in a separate PR; make this blocking then.
-      - name: Audit production dependencies (non-blocking until the dependency-upgrade PR)
+      - name: Audit production dependencies
         run: npm audit --omit=dev
-        continue-on-error: true
       - name: Build
         run: npm run build
         env:

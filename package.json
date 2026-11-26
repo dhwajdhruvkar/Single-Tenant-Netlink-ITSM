@@ -7,7 +7,8 @@
     "node": ">=22"
   },
   "overrides": {
-    "deepmerge-ts": "8.0.0"
+    "deepmerge-ts": "8.0.0",
+    "effect": "3.22.5"
   },
   "scripts": {
     "dev": "next dev",
@@ -25,8 +26,8 @@
   },
   "dependencies": {
     "@prisma/client": "6.19.3",
-    "next": "16.3.7",
-    "next-auth": "5.0.0-beta.31",
+    "next": "16.4.6",
+    "next-auth": "5.0.0-beta.32",
     "react": "19.0.0",
     "react-dom": "19.0.0",
     "zod": "^4.4.3"
@@ -37,7 +38,7 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "eslint": "9.39.5",
-    "eslint-config-next": "16.3.7",
+    "eslint-config-next": "16.4.6",
     "prisma": "6.19.3",
     "tailwindcss": "^4.0.0",
     "tsx": "^4.23.15",

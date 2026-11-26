@@ -52,3 +52,10 @@ export class RateLimitedError extends AppError {
     this.retryAfterSeconds = retryAfterSeconds;
   }
 }
+
+/** The request is well-formed but cannot be processed in the current state (e.g. requester not eligible). */
+export class UnprocessableError extends AppError {
+  constructor(code: string, message: string, details?: unknown) {
+    super(422, code, message, details);
+  }
+}

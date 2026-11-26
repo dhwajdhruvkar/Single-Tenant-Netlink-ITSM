@@ -1,0 +1,4 @@
+{
+  "_comment": "TEMPLATE, not active. Phase 13 (after the owner's written approval) merges this into vercel.json for the NEW Vercel project only. A per-minute cron needs a paid Vercel plan; on Hobby use a daily cron plus an external scheduler calling the endpoint with CRON_SECRET (docs/planning/INFRASTRUCTURE_AND_DEPLOYMENT.md step 10). Vercel Cron sends `Authorization: Bearer $CRON_SECRET` when CRON_SECRET is set.",
+  "crons": [{ "path": "/api/internal/jobs/run", "schedule": "* * * * *" }]
+}

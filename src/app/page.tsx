@@ -15,6 +15,7 @@ export default async function HomePage() {
     { href: "/my/tickets/new", label: "Report a problem or request something" },
     { href: "/my/tickets", label: "My tickets" },
     ...(can(actor.role, "ticket.view.queue") ? [{ href: "/desk", label: "Service desk queues" }] : []),
+    ...(can(actor.role, "config.manage") ? [{ href: "/admin", label: "Administration" }] : []),
     ...(can(actor.role, "ticket.create.assisted") ? [{ href: "/desk/tickets/new", label: "Log a ticket for an employee" }] : []),
   ];
   return (

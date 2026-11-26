@@ -3,8 +3,12 @@
   "version": "0.0.0",
   "private": true,
   "description": "Netlink single-company IT service management application.",
-  "engines": { "node": ">=22" },
-  "overrides": { "deepmerge-ts": "8.0.0" },
+  "engines": {
+    "node": ">=22"
+  },
+  "overrides": {
+    "deepmerge-ts": "8.0.0"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -16,7 +20,8 @@
     "db:generate": "prisma generate",
     "db:migrate:dev": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "db:seed:reference": "tsx prisma/seed-reference.ts"
   },
   "dependencies": {
     "@prisma/client": "6.19.3",
@@ -35,6 +40,7 @@
     "eslint-config-next": "16.3.7",
     "prisma": "6.19.3",
     "tailwindcss": "^4.0.0",
+    "tsx": "^4.23.15",
     "typescript": "^5.7.0",
     "vitest": "4.1.11"
   }

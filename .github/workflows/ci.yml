@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+      - name: Type check
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Unit tests
+        run: npm test
+      # Non-blocking in Phase 0: the pinned baseline versions (next 16.3.7, next-auth 5.0.0-beta.31) have known
+      # advisories. The roadmap keeps pins for the baseline and upgrades in a separate PR; make this blocking then.
+      - name: Audit production dependencies (non-blocking until the dependency-upgrade PR)
+        run: npm audit --omit=dev
+        continue-on-error: true
+      - name: Build
+        run: npm run build
+        env:
+          AUTH_SECRET: ci-build-secret

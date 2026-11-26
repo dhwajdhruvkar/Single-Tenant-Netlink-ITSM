@@ -22,6 +22,7 @@ const EXPECTED: Record<Permission, [boolean, boolean, boolean, boolean, boolean]
   "ticket.reassign.any": [N, N, N, Y, Y],
   "ticket.edit.priority": [N, N, Y, Y, Y],
   "ticket.edit.category": [N, N, Y, Y, Y],
+  "ticket.update": [N, N, Y, Y, Y],
   "ticket.resolve": [N, N, Y, Y, Y],
   // DELIBERATE DEVIATION from Doc C (which shows "-" for submitter): roles are a hierarchy and a submitter is an employee
   // plus extra rights, so a submitter keeps the employee right to confirm/reopen their OWN tickets (record-level rule).

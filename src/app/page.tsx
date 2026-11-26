@@ -1,8 +1,13 @@
+import { AppShell } from "@/ui/AppShell";
+import { Card, PageHeader } from "@/ui/primitives";
+
 export default function HomePage() {
   return (
-    <main className="p-8">
-      <h1 className="text-2xl font-semibold">Netlink ITSM</h1>
-      <p className="mt-2 text-sm text-gray-600">Baseline placeholder. Application features arrive in later phases.</p>
-    </main>
+    <AppShell>
+      <PageHeader title="Netlink ITSM" description="Foundation placeholder. Application features arrive in later phases." />
+      <Card>
+        <p className="text-sm text-gray-600">Sign-in and ticketing are not available yet.</p>
+      </Card>
+    </AppShell>
   );
 }

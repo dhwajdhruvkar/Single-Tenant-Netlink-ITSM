@@ -1,0 +1,14 @@
+// Phase 1 placeholder: generator + datasource only so the client can be generated and the app can connect.
+// Phase 2 replaces this with the full baseline schema (docs/planning/DATABASE_DESIGN.md).
+
+generator client {
+  provider      = "prisma-client-js"
+  // The Docker runtime image is Debian bookworm (OpenSSL 3); the build stage has no OpenSSL to auto-detect.
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}

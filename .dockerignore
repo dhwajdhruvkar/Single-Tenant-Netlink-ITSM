@@ -1,0 +1,12 @@
+.git
+.github
+node_modules
+.next
+.env*
+!.env.example
+storage-local
+docs
+tests
+coverage
+*.md
+docker-compose.yml

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { AppError, RateLimitedError } from "@/platform/errors";
+import { assertSameOrigin } from "@/platform/http/csrf";
 import { logger } from "@/platform/logging/logger";
 
 // JSON envelope: success -> { data }, failure -> { error: { code, message, details? } }.
@@ -56,10 +57,15 @@ export function errorResponse(err: unknown, requestId: string): NextResponse {
 }
 
 /** Wrap a route handler: request id, error mapping, response envelope. */
-export function withApi(handler: (req: Request, ctx: ApiContext) => Promise<Response> | Response) {
+export function withApi(
+  handler: (req: Request, ctx: ApiContext) => Promise<Response> | Response,
+  options: { csrf?: boolean } = {},
+) {
   return async (req: Request, routeCtx?: RouteContext): Promise<Response> => {
     const requestId = requestIdFrom(req);
     try {
+      // Cookie-authenticated mutations are origin-checked. Bearer-secret endpoints (cron) opt out with { csrf: false }.
+      if (options.csrf !== false) assertSameOrigin(req, process.env.APP_BASE_URL ?? "http://localhost:3000");
       const params = (await routeCtx?.params) ?? {};
       const res = await handler(req, { requestId, params });
       if (!res.headers.has("x-request-id")) res.headers.set("x-request-id", requestId);

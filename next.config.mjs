@@ -16,7 +16,11 @@ const nextConfig = {
   // Standalone output is for the minimal Docker image; Vercel supplies its own build adapter.
   output: isVercelBuild ? undefined : "standalone",
   async headers() {
-    return [{ source: "/:path*", headers: securityHeaders }];
+    return [
+      { source: "/:path*", headers: securityHeaders },
+      // Authenticated content must not be cached or shown by the back button after sign-out.
+      { source: "/((?!_next/static|_next/image|favicon.ico).*)", headers: [{ key: "Cache-Control", value: "no-store" }] },
+    ];
   },
   serverExternalPackages: ["@prisma/client", ".prisma/client"],
 };

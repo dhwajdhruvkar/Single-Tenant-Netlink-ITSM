@@ -43,6 +43,8 @@ const schema = z.object({
   ENTRA_ROLE_ADMIN: z.string().default("ITSM.Admin"),
   ENTRA_ROLE_SUBMITTER: z.string().default("ITSM.Submitter"),
   SESSION_MAX_AGE_HOURS: intString(8),
+  // [OPEN] Whether agents may see all tickets regardless of queue. Default off (queue-scoped).
+  AGENTS_VIEW_ALL_TICKETS: bool.default(false),
 
   GRAPH_TENANT_ID: guid.optional(),
   GRAPH_CLIENT_ID: guid.optional(),

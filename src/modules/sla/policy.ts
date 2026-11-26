@@ -39,3 +39,35 @@ export async function computeSlaDues(db: Db, input: { priority: "p1" | "p2" | "p
     resolveDueAt: addBusinessMinutes(input.createdAt, policy.resolveMinutes, calendar),
   };
 }
+
+/** The calendar a ticket's SLA runs on: its policy's calendar, or 24x7 when there is no policy or no calendar. */
+export async function calendarForPolicy(db: Pick<PrismaClient, "slaPolicy">, slaPolicyId: string | null): Promise<CalendarSpec> {
+  if (!slaPolicyId) return ALWAYS_OPEN;
+  const p = await db.slaPolicy.findUnique({ where: { id: slaPolicyId }, include: { calendar: { include: { holidays: true } } } });
+  if (!p?.calendar) return ALWAYS_OPEN;
+  return {
+    timezone: p.calendar.timezone,
+    workDays: p.calendar.workDays,
+    startMinute: p.calendar.startMinute,
+    endMinute: p.calendar.endMinute,
+    holidays: p.calendar.holidays.map((h) => h.date.toISOString().slice(0, 10)),
+  };
+}
+
+/**
+ * Due dates for a ticket whose priority (or type) changed: recomputed from its creation time, then pushed out by the business minutes it
+ * has already spent on hold, so time on hold is not clawed back by the recalculation.
+ */
+export async function recomputeSlaDues(
+  db: Pick<PrismaClient, "slaPolicy">,
+  input: { priority: "p1" | "p2" | "p3" | "p4"; type: "incident" | "service_request"; createdAt: Date; slaPausedMinutes: number },
+): Promise<SlaDues> {
+  const base = await computeSlaDues(db, input);
+  if (!base.slaPolicyId || input.slaPausedMinutes <= 0) return base;
+  const calendar = await calendarForPolicy(db, base.slaPolicyId);
+  return {
+    slaPolicyId: base.slaPolicyId,
+    responseDueAt: base.responseDueAt && addBusinessMinutes(base.responseDueAt, input.slaPausedMinutes, calendar),
+    resolveDueAt: base.resolveDueAt && addBusinessMinutes(base.resolveDueAt, input.slaPausedMinutes, calendar),
+  };
+}

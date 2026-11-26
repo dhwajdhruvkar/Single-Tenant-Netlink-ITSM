@@ -19,6 +19,7 @@ export const PERMISSIONS = [
   "ticket.reassign.any",
   "ticket.edit.priority", // override needs a reason
   "ticket.edit.category",
+  "ticket.update", // work on a ticket: set in_progress / on_hold, edit fields
   "ticket.resolve",
   "ticket.confirm_reopen", // record-level: requester, or agent+
   "ticket.close",
@@ -56,6 +57,7 @@ const MINIMUM: Record<Permission, Rule> = {
   "ticket.reassign.any": "manager",
   "ticket.edit.priority": "agent",
   "ticket.edit.category": "agent",
+  "ticket.update": "agent",
   "ticket.resolve": "agent",
   "ticket.confirm_reopen": "all",
   "ticket.close": "agent",

@@ -59,3 +59,10 @@ export class UnprocessableError extends AppError {
     super(422, code, message, details);
   }
 }
+
+/** Optimistic-concurrency failure: the ticket changed since the client loaded it (HTTP 409, code STALE_VERSION). */
+export class StaleVersionError extends AppError {
+  constructor(message = "This ticket was changed by someone else. Reload it and try again.") {
+    super(409, "STALE_VERSION", message);
+  }
+}

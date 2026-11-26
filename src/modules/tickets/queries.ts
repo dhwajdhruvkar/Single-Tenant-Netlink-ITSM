@@ -1,7 +1,6 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 import type { Actor } from "@/modules/identity/actor";
 import type { PolicyOptions } from "@/modules/identity/permissions";
-import { atLeast } from "@/modules/identity/roleMapping";
 import { visibleTicketsWhere } from "./access";
 
 type Db = Pick<PrismaClient, "ticket" | "category" | "assignmentGroup" | "attachment">;
@@ -31,16 +30,6 @@ export async function listCategoriesFor(db: Pick<Db, "category">, type: "inciden
   return all.filter((c) => c.ticketTypes.length === 0 || c.ticketTypes.includes(type));
 }
 
-/** Tickets the actor filed for themselves or created for others. Minimal list; the full explorer arrives in Phase 7. */
-export async function listMyTickets(db: Pick<Db, "ticket">, actor: Actor, limit = 50): Promise<TicketListItem[]> {
-  return db.ticket.findMany({
-    where: { archivedAt: null, OR: [{ requesterEmployeeId: actor.employeeId }, { createdByEmployeeId: actor.employeeId }] },
-    orderBy: { createdAt: "desc" },
-    take: limit,
-    select: listSelect,
-  });
-}
-
 /** The last tickets for a given requester that THIS actor is allowed to see (used to avoid duplicates in the assisted form). */
 export async function listRecentForRequester(db: Pick<Db, "ticket">, actor: Actor, requesterEmployeeId: string, limit = 5, options: PolicyOptions = {}): Promise<TicketListItem[]> {
   return db.ticket.findMany({
@@ -49,47 +38,6 @@ export async function listRecentForRequester(db: Pick<Db, "ticket">, actor: Acto
     take: limit,
     select: listSelect,
   });
-}
-
-export interface AttachmentItem {
-  id: string;
-  fileName: string;
-  contentType: string;
-  sizeBytes: number;
-}
-
-export interface TicketSummary extends TicketListItem {
-  attachments: AttachmentItem[];
-  description: string;
-  impact: string;
-  urgency: string;
-  channel: string;
-  createdByName: string;
-  assignmentGroup: string | null;
-  assignee: string | null;
-  responseDueAt: Date | null;
-  resolveDueAt: Date | null;
-}
-
-/** A ticket by reference, only if the actor may see it (otherwise null => 404; existence is never revealed). */
-export async function getTicketSummaryForViewer(db: Pick<Db, "ticket" | "attachment">, actor: Actor, reference: string, options: PolicyOptions = {}): Promise<TicketSummary | null> {
-  const t = await db.ticket.findFirst({
-    where: { AND: [visibleTicketsWhere(actor, options), { reference }] },
-    select: { ...listSelect, description: true, impact: true, urgency: true, channel: true, responseDueAt: true, resolveDueAt: true, createdBy: { select: { displayName: true } }, assignmentGroup: { select: { name: true } }, assignee: { select: { displayName: true } } },
-  });
-  if (!t) return null;
-  const { createdBy, assignmentGroup, assignee, ...rest } = t;
-  // Files on internal messages are filtered in the query itself: non-agents never receive them.
-  const attachments = await db.attachment.findMany({
-    where: {
-      ticketId: t.id,
-      status: "linked",
-      ...(atLeast(actor.role, "agent") ? {} : { OR: [{ messageId: null }, { message: { visibility: "public", deletedAt: null } }] }),
-    },
-    orderBy: { createdAt: "asc" },
-    select: { id: true, fileName: true, contentType: true, sizeBytes: true },
-  });
-  return { ...rest, attachments, createdByName: createdBy.displayName, assignmentGroup: assignmentGroup?.name ?? null, assignee: assignee?.displayName ?? null };
 }
 
 export interface GroupOption {

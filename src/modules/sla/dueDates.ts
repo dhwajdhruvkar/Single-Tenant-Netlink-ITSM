@@ -73,3 +73,35 @@ export function addBusinessMinutes(from: Date, minutes: number, calendar: Calend
   }
   return new Date(cursor);
 }
+
+/**
+ * Working minutes between two instants in the calendar (the part of [from, to) that falls inside open hours). Used to credit time a
+ * ticket spent on hold: only hours the SLA clock would actually have been running count.
+ */
+export function calendarMinutesBetween(from: Date, to: Date, calendar: CalendarSpec): number {
+  if (to.getTime() <= from.getTime()) return 0;
+  if (isAlwaysOpen(calendar)) return (to.getTime() - from.getTime()) / MINUTE_MS;
+
+  const holidays = new Set(calendar.holidays);
+  let cursor = from.getTime();
+  const end = to.getTime();
+  let ms = 0;
+
+  for (let steps = 0; cursor < end; steps++) {
+    if (steps > MAX_STEPS * 2) throw new Error("Calendar interval is too long");
+    const z = zoned(new Date(cursor), calendar.timezone);
+    const msIntoMinute = ((cursor % MINUTE_MS) + MINUTE_MS) % MINUTE_MS;
+    const open = calendar.workDays.includes(z.weekday) && !holidays.has(z.ymd);
+
+    if (open && z.minuteOfDay >= calendar.startMinute && z.minuteOfDay < calendar.endMinute) {
+      const step = Math.min(end - cursor, (calendar.endMinute - z.minuteOfDay) * MINUTE_MS - msIntoMinute);
+      ms += step;
+      cursor += step;
+    } else if (open && z.minuteOfDay < calendar.startMinute) {
+      cursor += Math.min(end - cursor, (calendar.startMinute - z.minuteOfDay) * MINUTE_MS - msIntoMinute);
+    } else {
+      cursor += Math.min(end - cursor, (60 - (z.minuteOfDay % 60)) * MINUTE_MS - msIntoMinute);
+    }
+  }
+  return ms / MINUTE_MS;
+}

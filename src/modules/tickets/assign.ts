@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { autoAssignee } from "@/modules/assignment/autoAssign";
 import { enqueueJobs } from "@/modules/jobs/enqueue";
 import type { Actor } from "@/modules/identity/actor";
 import { can } from "@/modules/identity/permissions";
@@ -52,13 +53,19 @@ export async function assignTicket(deps: OpsDeps, actor: Actor, reference: strin
     if (requested !== undefined) assignee = requested;
 
     const groupChanged = groupId !== t.assignmentGroupId;
+    let autoPicked = false;
     if (requested === undefined && groupChanged && assignee) {
       // moving the ticket to another group keeps the assignee only if they belong to it
       const stillMember = await tx.assignmentGroupMember.findFirst({ where: { groupId: groupId!, employeeId: assignee, ...eligibleMember }, select: { employeeId: true } });
-      if (!stillMember) assignee = null;
+      if (!stillMember) {
+        assignee = null;
+        // Moved to a group with an auto-assignment strategy: it picks the new owner instead of leaving the ticket untaken.
+        assignee = await autoAssignee(tx, groupId);
+        autoPicked = assignee !== null;
+      }
     }
 
-    if (assignee && assignee !== t.assigneeEmployeeId) {
+    if (assignee && assignee !== t.assigneeEmployeeId && !autoPicked) {
       const isSelf = assignee === actor.employeeId;
       const inGroup = groupId
         ? await tx.assignmentGroupMember.findFirst({ where: { groupId, employeeId: assignee, ...eligibleMember }, select: { employeeId: true } })

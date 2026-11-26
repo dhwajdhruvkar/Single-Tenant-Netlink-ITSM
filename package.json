@@ -22,7 +22,8 @@
     "db:migrate:dev": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
     "db:studio": "prisma studio",
-    "db:seed:reference": "tsx prisma/seed-reference.ts"
+    "db:seed:reference": "tsx prisma/seed-reference.ts",
+    "worker": "tsx worker.ts"
   },
   "dependencies": {
     "@prisma/client": "6.19.3",

@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { writeAudit } from "@/modules/audit/auditWriter";
 import { enqueueJobs } from "@/modules/jobs/enqueue";
+import { autoAssignee } from "@/modules/assignment/autoAssign";
 import { routeTicket } from "@/modules/assignment/routing";
 import type { Actor } from "@/modules/identity/actor";
 import { can } from "@/modules/identity/permissions";
@@ -187,12 +188,15 @@ export async function createTicket(deps: CreateTicketDeps, actor: Actor, cmd: Cr
   try {
     const ticket = await db.$transaction(async (tx) => {
       const number = await allocateTicketNumber(tx);
+      // No explicit assignee: let the group's strategy (round robin / least loaded) pick one. Manual groups stay unassigned.
+      const auto = cmd.assigneeEmployeeId ? null : await autoAssignee(tx, routing.groupId);
+      const assigneeId = cmd.assigneeEmployeeId ?? auto;
       const created = await tx.ticket.create({
         data: {
           number,
           reference: formatReference(cmd.type, number),
           type: cmd.type,
-          status: cmd.assigneeEmployeeId ? "assigned" : "new",
+          status: assigneeId ? "assigned" : "new",
           channel: cmd.channel,
           subject: cmd.subject,
           description: cmd.description,
@@ -212,7 +216,7 @@ export async function createTicket(deps: CreateTicketDeps, actor: Actor, cmd: Cr
           requesterLocation,
           contactPhone: cmd.contactPhone ?? requester.businessPhone ?? requester.mobilePhone ?? null,
           assignmentGroupId: routing.groupId,
-          assigneeEmployeeId: cmd.assigneeEmployeeId ?? null,
+          assigneeEmployeeId: assigneeId,
           slaPolicyId: sla.slaPolicyId,
           responseDueAt: sla.responseDueAt,
           resolveDueAt: sla.resolveDueAt,
@@ -235,6 +239,7 @@ export async function createTicket(deps: CreateTicketDeps, actor: Actor, cmd: Cr
             channel: cmd.channel,
             onBehalf: requester.id !== actor.employeeId,
             routing: routing.source,
+            ...(auto ? { autoAssigned: true } : {}),
             derivedPriority: derived,
             attachmentCount: cmd.attachmentIds.length,
             ...(cmd.idempotencyKey ? { requestHash } : {}),
@@ -258,6 +263,7 @@ export async function createTicket(deps: CreateTicketDeps, actor: Actor, cmd: Cr
           priority,
           priorityOverridden: Boolean(cmd.priorityOverride),
           assignmentGroupId: routing.groupId,
+          ...(assigneeId ? { assigneeEmployeeId: assigneeId, autoAssigned: Boolean(auto) } : {}),
         },
       });
 
@@ -266,7 +272,7 @@ export async function createTicket(deps: CreateTicketDeps, actor: Actor, cmd: Cr
         {
           kind: "notify.ticket_assigned",
           dedupeKey: `${created.id}:assigned`,
-          payload: { ticketId: created.id, assignmentGroupId: routing.groupId, assigneeEmployeeId: cmd.assigneeEmployeeId ?? null },
+          payload: { ticketId: created.id, assignmentGroupId: routing.groupId, assigneeEmployeeId: assigneeId },
         },
       ]);
 

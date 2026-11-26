@@ -5,6 +5,7 @@ import { prisma } from "@/platform/db/prisma";
 import { readJson, withApi } from "@/platform/http/handler";
 import { readIdempotencyKey } from "@/platform/http/idempotency";
 import { requireActor } from "@/platform/http/requireActor";
+import { dispatchJobsAfterResponse } from "@/platform/jobsDispatch";
 import { dbRateLimiter, enforceRateLimit } from "@/platform/rateLimit/dbRateLimit";
 
 export const dynamic = "force-dynamic";
@@ -22,5 +23,6 @@ export const POST = withApi(async (req, { requestId }) => {
     idempotencyKey: readIdempotencyKey(req),
     requestId,
   });
+  dispatchJobsAfterResponse();
   return NextResponse.json({ data: { id: ticket.id, reference: ticket.reference } }, { status: replayed ? 200 : 201, headers: replayed ? { "Idempotency-Replayed": "true" } : {} });
 });

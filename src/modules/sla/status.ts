@@ -1,6 +1,6 @@
 // Derived SLA health. Computed from timestamps on read, so correctness never depends on a background job having run.
 
-export const AT_RISK_FRACTION = 0.8;
+export const AT_RISK_FRACTION = 0.75; // roadmap: warning at >= 75% of the window elapsed
 export type SlaLevel = "none" | "paused" | "met" | "on_track" | "at_risk" | "breached";
 
 export interface SlaFacts {

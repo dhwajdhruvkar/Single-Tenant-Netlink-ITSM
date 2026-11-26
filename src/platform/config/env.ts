@@ -51,6 +51,8 @@ const schema = z.object({
   GRAPH_CLIENT_SECRET: optionalString,
   DIRECTORY_SYNC_ENABLED: bool.default(false),
   DIRECTORY_ELIGIBILITY_COMPANY_NAME: optionalString,
+  // [OPEN] Comma-separated UPN prefixes that mark service/shared accounts, excluded from the directory.
+  DIRECTORY_ELIGIBILITY_EXCLUDE_UPN_PREFIXES: z.string().default("svc-"),
 
   STORAGE_PROVIDER: z.enum(["local", "database", "s3", "azure_blob"]).default("database"),
   ATTACHMENT_MAX_BYTES: intString(4 * 1024 * 1024),

@@ -103,6 +103,12 @@ export function parseConfig(env: Record<string, string | undefined>): AppConfig 
   }
   const cfg = result.data;
 
+  if (cfg.EMAIL_PROVIDER === "graph") {
+    if (!cfg.SUPPORT_MAILBOX || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cfg.SUPPORT_MAILBOX)) problems.push("SUPPORT_MAILBOX: a valid email address is required when EMAIL_PROVIDER is graph");
+    for (const key of ["GRAPH_TENANT_ID", "GRAPH_CLIENT_ID", "GRAPH_CLIENT_SECRET"] as const) {
+      if (!cfg[key]) problems.push(`${key}: required when EMAIL_PROVIDER is graph`);
+    }
+  }
   if (cfg.APP_ENV === "production" || cfg.APP_ENV === "staging") {
     for (const key of PRODUCTION_REQUIRED) {
       if (!cfg[key]) problems.push(`${key}: required when APP_ENV is ${cfg.APP_ENV}`);

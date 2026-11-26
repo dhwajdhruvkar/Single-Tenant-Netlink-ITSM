@@ -12,6 +12,7 @@ export interface ClaimedJob {
   payload: unknown;
   attempts: number;
   maxAttempts: number;
+  dedupeKey: string | null;
 }
 
 export type JobHandler = (job: ClaimedJob) => Promise<void>;
@@ -58,7 +59,7 @@ async function claim(db: RunOptions["db"], kinds: string[], owner: string, now: 
       ORDER BY "runAfter" ASC, "createdAt" ASC
       LIMIT ${limit}
       FOR UPDATE SKIP LOCKED)
-    RETURNING "id", "kind", "payload", "attempts", "maxAttempts"`);
+    RETURNING "id", "kind", "payload", "attempts", "maxAttempts", "dedupeKey"`);
 }
 
 /** Process due jobs. Only kinds that have a registered handler are claimed; anything else stays queued for whoever can handle it. */

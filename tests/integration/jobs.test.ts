@@ -223,7 +223,7 @@ describe("schedules: slot lease", () => {
 });
 
 describe("handlers end to end through the runner", () => {
-  const handlers = (over: object = {}) => buildHandlers({ db: prisma, clock: fixedClock(T), storage: () => new DatabaseStorage(prisma), directory: () => null, ...over });
+  const handlers = (over: object = {}) => buildHandlers({ db: prisma, clock: fixedClock(T), storage: () => new DatabaseStorage(prisma), directory: () => null, mail: () => ({ provider: "noop" as const, send: async () => undefined }), appBaseUrl: "http://localhost:3000", ...over });
 
   it("a scheduled sla.evaluate job runs and a due-schedule + runner pass drains it", async () => {
     await runDueSchedules(prisma, defaultSchedules({ directorySyncEnabled: false }), fixedClock(T));

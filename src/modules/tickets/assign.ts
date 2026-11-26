@@ -92,7 +92,7 @@ export async function assignTicket(deps: OpsDeps, actor: Actor, reference: strin
       action: "ticket.assign", actorType: "user", actorEmployeeId: actor.employeeId, entityType: "ticket", entityId: t.id, ticketId: t.id, requestId: ctx.requestId,
       changes: { ...(groupChanged ? { assignmentGroupId: [t.assignmentGroupId, groupId] } : {}), ...(assigneeChanged ? { assigneeEmployeeId: [t.assigneeEmployeeId, assignee] } : {}) },
     });
-    await enqueueJobs(tx, [{ kind: "notify.ticket_assigned", dedupeKey: `${t.id}:v${updated.version}:assigned`, payload: { ticketId: t.id, assignmentGroupId: groupId, assigneeEmployeeId: assignee } }]);
+    await enqueueJobs(tx, [{ kind: "notify.ticket_assigned", dedupeKey: `${t.id}:v${updated.version}:assigned`, payload: { ticketId: t.id, assignmentGroupId: groupId, assigneeEmployeeId: assignee, actorEmployeeId: actor.employeeId } }]);
     return resultOf(updated);
   });
 }

@@ -272,7 +272,7 @@ export async function createTicket(deps: CreateTicketDeps, actor: Actor, cmd: Cr
         {
           kind: "notify.ticket_assigned",
           dedupeKey: `${created.id}:assigned`,
-          payload: { ticketId: created.id, assignmentGroupId: routing.groupId, assigneeEmployeeId: assigneeId },
+          payload: { ticketId: created.id, assignmentGroupId: routing.groupId, assigneeEmployeeId: assigneeId, actorEmployeeId: actor.employeeId },
         },
       ]);
 

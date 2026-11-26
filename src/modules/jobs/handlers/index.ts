@@ -8,6 +8,8 @@ import { evaluateSla } from "@/modules/sla/evaluate";
 import { autoCloseResolved } from "@/modules/tickets/autoClose";
 import { systemClock, type Clock } from "@/platform/clock";
 import { logger } from "@/platform/logging/logger";
+import { buildNotificationHandlers } from "@/modules/notifications/dispatcher";
+import type { MailSender } from "@/modules/notifications/ports";
 import type { HandlerRegistry } from "../runner";
 
 export interface HandlerDeps {
@@ -16,15 +18,18 @@ export interface HandlerDeps {
   storage: () => ObjectStorage;
   /** null when Graph is not configured */
   directory: () => { provider: DirectoryProvider; eligibility: EligibilityConfig } | null;
+  /** resolved lazily so a bad EMAIL_PROVIDER only fails email jobs, not the whole runner */
+  mail: () => MailSender;
+  appBaseUrl: string;
 }
 
 /**
- * The jobs this build can run. Notification kinds (notify.*) are added in Phase 9; until a kind has a handler, the runner leaves those
- * rows queued instead of failing them, so nothing enqueued earlier is lost.
+ * The jobs this build can run. A kind without a handler is left queued by the runner (never failed), so nothing is lost.
  */
 export function buildHandlers(deps: HandlerDeps): HandlerRegistry {
   const clock = deps.clock ?? systemClock;
   return {
+    ...buildNotificationHandlers({ db: deps.db, mail: deps.mail, appBaseUrl: deps.appBaseUrl }),
     "sla.evaluate": async () => {
       const r = await evaluateSla(deps.db, clock.now());
       if (r.responseBreached || r.resolveBreached || r.warnings) logger.info("sla evaluated", { ...r });

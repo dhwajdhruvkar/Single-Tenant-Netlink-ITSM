@@ -5,6 +5,7 @@ import { runDueJobs, type RunResult } from "@/modules/jobs/runner";
 import { defaultSchedules, runDueSchedules } from "@/modules/jobs/schedules";
 import { loadConfig } from "@/platform/config/env";
 import { prisma } from "@/platform/db/prisma";
+import { getMailSender } from "@/platform/mail";
 import { getStorage } from "@/platform/storage";
 
 // Composition root for background work. The same function serves the cron endpoint, the worker process and inline dispatch.
@@ -13,6 +14,8 @@ export function jobHandlers() {
   return buildHandlers({
     db: prisma,
     storage: getStorage,
+    mail: getMailSender,
+    appBaseUrl: loadConfig().APP_BASE_URL,
     directory: () => {
       const provider = getDirectoryProvider();
       return provider ? { provider, eligibility: getEligibilityConfig() } : null;

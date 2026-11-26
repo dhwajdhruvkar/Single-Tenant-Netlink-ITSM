@@ -58,16 +58,33 @@ export class GraphClient {
 
   /** GET a path (relative to v1.0) or an absolute Graph URL. Returns parsed JSON, or null on 404. */
   async get<T>(pathOrUrl: string, headers: Record<string, string> = {}): Promise<T | null> {
+    const res = await this.request("GET", pathOrUrl, undefined, headers);
+    if (res.status === 404) return null;
+    return (await res.json()) as T;
+  }
+
+  /** POST a JSON body. Resolves with the HTTP status on success (Graph answers 202 with no body for sendMail); throws GraphRequestError otherwise. */
+  async post(pathOrUrl: string, body: unknown, headers: Record<string, string> = {}): Promise<number> {
+    const res = await this.request("POST", pathOrUrl, body, headers);
+    return res.status;
+  }
+
+  private async request(method: "GET" | "POST", pathOrUrl: string, body: unknown, headers: Record<string, string>): Promise<Response> {
     // Only "/..." paths are relative; anything else must be an absolute https://graph.microsoft.com URL.
     const url = assertGraphUrl(pathOrUrl.startsWith("/") ? `${GRAPH_BASE}${pathOrUrl}` : pathOrUrl);
     for (let attempt = 0; ; attempt++) {
       const token = await this.opts.getToken();
       const res = await withTimeout(
-        this.fetchImpl(url, { headers: { Authorization: `Bearer ${token}`, Accept: "application/json", ...headers }, redirect: "error" }),
+        this.fetchImpl(url, {
+          method,
+          headers: { Authorization: `Bearer ${token}`, Accept: "application/json", ...(body !== undefined ? { "Content-Type": "application/json" } : {}), ...headers },
+          body: body !== undefined ? JSON.stringify(body) : undefined,
+          redirect: "error",
+        }),
         this.timeoutMs,
         "Graph request",
       );
-      if (res.status === 404) return null;
+      if (res.status === 404 && method === "GET") return res;
       if ((res.status === 429 || res.status === 503) && attempt < this.maxRetries) {
         const wait = Math.min(parseRetryAfter(res.headers.get("retry-after")) ?? 1000 * 2 ** attempt, this.maxWait);
         logger.warn("graph throttled; retrying", { status: res.status, attempt: attempt + 1, waitMs: wait });
@@ -75,7 +92,7 @@ export class GraphClient {
         continue;
       }
       if (!res.ok) throw new GraphRequestError(res.status);
-      return (await res.json()) as T;
+      return res;
     }
   }
 }

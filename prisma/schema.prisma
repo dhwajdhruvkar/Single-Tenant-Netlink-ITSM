@@ -469,6 +469,7 @@ model Notification {
   link                String?
   ticketId            String?   @db.Uuid
   readAt              DateTime?
+  dedupeKey           String?   @unique   // {event}:{recipient}: makes a re-run of the dispatch job a no-op
   createdAt           DateTime  @default(now())
   recipient           Employee  @relation(fields: [recipientEmployeeId], references: [id], onDelete: Cascade)
 

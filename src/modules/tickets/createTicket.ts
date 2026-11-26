@@ -8,7 +8,8 @@ import { can } from "@/modules/identity/permissions";
 import { atLeast } from "@/modules/identity/roleMapping";
 import { computeSlaDues } from "@/modules/sla/policy";
 import { systemClock, type Clock } from "@/platform/clock";
-import { ConflictError, ForbiddenError, UnprocessableError, ValidationError } from "@/platform/errors";
+import { linkStagedAttachments } from "@/modules/attachments/service";
+import { ConflictError, ForbiddenError, UnprocessableError } from "@/platform/errors";
 import type { TicketCreatedDTO } from "./dto";
 import { derivePriority, type Level, type Priority } from "./priority";
 import { allocateTicketNumber, formatReference } from "./reference";
@@ -125,7 +126,6 @@ export async function createTicket(deps: CreateTicketDeps, actor: Actor, cmd: Cr
   if (onBehalfCommand ? !can(actor.role, "ticket.create.assisted") : !can(actor.role, "ticket.create.self")) throw new ForbiddenError();
   const agentOnly = Boolean(cmd.priorityOverride || cmd.assignmentGroupId || cmd.assigneeEmployeeId);
   if (agentOnly && !atLeast(actor.role, "agent")) throw new ForbiddenError("Only agents can set a priority override, group or assignee.");
-  if (cmd.attachmentIds.length > 0) throw new ValidationError("Attachments are not available yet."); // linking arrives in Phase 6
 
   // --- idempotency ---------------------------------------------------------------------------------------------------
   if (cmd.idempotencyKey) {
@@ -222,6 +222,9 @@ export async function createTicket(deps: CreateTicketDeps, actor: Actor, cmd: Cr
         include: ticketInclude,
       });
 
+      // Same transaction: a bad attachment id rolls back the ticket as well.
+      await linkStagedAttachments(tx, { actorEmployeeId: actor.employeeId, ids: cmd.attachmentIds, ticketId: created.id, now: createdAt });
+
       await tx.ticketEvent.create({
         data: {
           ticketId: created.id,
@@ -233,6 +236,7 @@ export async function createTicket(deps: CreateTicketDeps, actor: Actor, cmd: Cr
             onBehalf: requester.id !== actor.employeeId,
             routing: routing.source,
             derivedPriority: derived,
+            attachmentCount: cmd.attachmentIds.length,
             ...(cmd.idempotencyKey ? { requestHash } : {}),
           },
         },

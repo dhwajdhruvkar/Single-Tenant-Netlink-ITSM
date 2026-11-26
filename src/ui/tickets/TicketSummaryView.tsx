@@ -25,6 +25,19 @@ export function TicketSummaryView({ ticket, created }: { ticket: TicketSummary; 
       </dl>
       <h2 className="mt-6 text-sm font-semibold text-gray-700">Description</h2>
       <p className="mt-1 whitespace-pre-wrap text-sm text-gray-900">{ticket.description}</p>
+      {ticket.attachments.length > 0 ? (
+        <>
+          <h2 className="mt-6 text-sm font-semibold text-gray-700">Attachments</h2>
+          <ul className="mt-1 list-disc pl-5 text-sm">
+            {ticket.attachments.map((a) => (
+              <li key={a.id}>
+                <a className="text-blue-700 underline" href={`/api/attachments/${a.id}`} download>{a.fileName}</a>{" "}
+                <span className="text-gray-500">({Math.max(1, Math.round(a.sizeBytes / 1024))} KB)</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : null}
     </article>
   );
 }

@@ -3,6 +3,7 @@ import { getOwnProfile } from "@/modules/directory/profileService";
 import { listCategoriesFor } from "@/modules/tickets/queries";
 import { prisma } from "@/platform/db/prisma";
 import { getDirectoryProvider, getEligibilityConfig } from "@/platform/directory";
+import { attachmentsUiConfig } from "@/platform/storage";
 import { getPageActor } from "@/platform/http/pageActor";
 import { AppShell } from "@/ui/AppShell";
 import { PageHeader } from "@/ui/primitives";
@@ -21,11 +22,12 @@ export default async function NewTicketPage() {
   const [incident, request] = await Promise.all([listCategoriesFor(prisma, "incident"), listCategoriesFor(prisma, "service_request")]);
   const categories = [...new Map([...incident, ...request].map((c) => [c.id, c])).values()];
 
+  const attachments = attachmentsUiConfig();
   return (
     <AppShell>
       <PageHeader title="New ticket" description="Tell us what is wrong or what you need. We already know who you are." />
       <div className="max-w-2xl">
-        <NewTicketForm profile={profile} categories={categories} />
+        <NewTicketForm profile={profile} categories={categories} attachments={attachments} />
       </div>
     </AppShell>
   );

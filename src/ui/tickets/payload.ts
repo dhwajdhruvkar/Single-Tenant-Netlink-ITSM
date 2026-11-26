@@ -44,8 +44,10 @@ export function buildCommonPayload(v: TicketFormValues): Record<string, unknown>
 }
 
 /** Form B body: NO requester, creator, channel or role of any kind. */
-export function buildSelfPayload(v: TicketFormValues): Record<string, unknown> {
-  return buildCommonPayload(v);
+export function buildSelfPayload(v: TicketFormValues, attachmentIds: string[] = []): Record<string, unknown> {
+  const out = buildCommonPayload(v);
+  if (attachmentIds.length > 0) out.attachmentIds = attachmentIds;
+  return out;
 }
 
 export interface AgentFields {
@@ -62,8 +64,9 @@ export const EMPTY_AGENT_FIELDS: AgentFields = {
 };
 
 /** Form A body: only the requester's ID identifies them; name/email/department are re-read by the server. */
-export function buildAssistedPayload(v: TicketFormValues, requesterEmployeeId: string, a: AgentFields): Record<string, unknown> {
+export function buildAssistedPayload(v: TicketFormValues, requesterEmployeeId: string, a: AgentFields, attachmentIds: string[] = []): Record<string, unknown> {
   const out: Record<string, unknown> = { ...buildCommonPayload(v), requesterEmployeeId, channel: a.channel };
+  if (attachmentIds.length > 0) out.attachmentIds = attachmentIds;
   if (a.overrideEnabled) out.priorityOverride = { priority: a.overridePriority, reason: clean(a.overrideReason) };
   if (a.assignmentGroupId) out.assignmentGroupId = a.assignmentGroupId;
   if (a.assigneeEmployeeId) out.assigneeEmployeeId = a.assigneeEmployeeId;

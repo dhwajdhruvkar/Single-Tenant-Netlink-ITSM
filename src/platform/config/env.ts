@@ -56,6 +56,9 @@ const schema = z.object({
 
   STORAGE_PROVIDER: z.enum(["local", "database", "s3", "azure_blob"]).default("database"),
   ATTACHMENT_MAX_BYTES: intString(4 * 1024 * 1024),
+  // Rollback switch: false hides the UI and rejects uploads with 503.
+  ATTACHMENTS_ENABLED: bool.default(true),
+  STORAGE_LOCAL_DIR: z.string().default("./storage-local"),
   ATTACHMENT_REQUIRE_CLEAN_SCAN: bool.default(false),
 
   EMAIL_PROVIDER: z.enum(["noop", "graph", "smtp"]).default("noop"),

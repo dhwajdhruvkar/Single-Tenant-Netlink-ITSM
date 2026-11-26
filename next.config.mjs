@@ -1,5 +1,5 @@
 /** @type {import('next').NextConfig} */
-// Baseline security headers. The CSP is tightened in Phase 1/11.
+// Baseline security headers. CSP is tightened in Phase 11.
 const securityHeaders = [
   { key: "X-Frame-Options", value: "SAMEORIGIN" },
   { key: "X-Content-Type-Options", value: "nosniff" },
@@ -9,8 +9,12 @@ const securityHeaders = [
   { key: "X-DNS-Prefetch-Control", value: "off" },
 ];
 
+const isVercelBuild = process.env.VERCEL === "1";
+
 const nextConfig = {
   reactStrictMode: true,
+  // Standalone output is for the minimal Docker image; Vercel supplies its own build adapter.
+  output: isVercelBuild ? undefined : "standalone",
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

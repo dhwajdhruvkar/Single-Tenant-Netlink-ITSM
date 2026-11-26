@@ -19,6 +19,10 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci --ignore-scripts
+      - name: Generate Prisma client
+        run: npm run db:generate
+        env:
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
       - name: Type check
         run: npm run typecheck
       - name: Lint
@@ -34,3 +38,11 @@ jobs:
         run: npm run build
         env:
           AUTH_SECRET: ci-build-secret
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build production image
+        run: docker build -t netlink-itsm:ci .
